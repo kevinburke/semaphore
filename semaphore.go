@@ -2,18 +2,24 @@ package semaphore
 
 import (
 	"context"
-	"errors"
 	"sync"
-	"time"
 )
 
-// Semaphore is an implementation of semaphore.
+// Semaphore allows you to control the number of in-flight requests of a given
+// service.
 type Semaphore struct {
-	permits int
+	n       int
 	avail   int
 	channel chan struct{}
-	aMutex  *sync.RWMutex
-	rMutex  *sync.Mutex
+	mu      sync.RWMutex
+}
+
+// Len returns the total number of workers in this semaphore.
+func (s *Semaphore) Len() int {
+	s.mu.RLock()
+	n := s.n
+	s.mu.RUnlock()
+	return n
 }
 
 // New creates a new Semaphore with specified number of concurrent workers.
@@ -29,97 +35,52 @@ func New(n int) *Semaphore {
 	}
 
 	return &Semaphore{
-		n,
-		n,
-		channel,
-		&sync.RWMutex{},
-		&sync.Mutex{},
+		n:       n,
+		avail:   n,
+		channel: channel,
 	}
 }
 
 // Acquire blocks until a worker becomes available.
 func (s *Semaphore) Acquire() {
-	s.aMutex.Lock()
-	defer s.aMutex.Unlock()
-
-	<-s.channel
-	s.avail--
+	s.AcquireContext(context.Background())
 }
 
-// AcquireMany is similar to Acquire() but for many workers.
-// An error is returned if n is greater number of workers in the semaphore.
-func (s *Semaphore) AcquireMany(n int) error {
-	if n > s.permits {
-		return errors.New("Too many requested permits")
-	}
-	s.aMutex.Lock()
-	defer s.aMutex.Unlock()
-
-	s.avail -= n
-	for ; n > 0; n-- {
-		<-s.channel
-	}
-	s.avail += n
-	return nil
-}
-
-// AcquireWithin is similar to AcquireMany() but cancels if duration elapses before getting the permits.
-// Returns true if successful and false if timeout occurs.
-func (s *Semaphore) AcquireContext(n int, ctx context.Context) bool {
-	go func() {
-		time.Sleep(d)
-		timeout <- true
-	}()
-	go func() {
-		s.AcquireMany(n)
-		timeout <- false
-		if <-cancel {
-			s.ReleaseMany(n)
-		}
-	}()
-	if <-timeout {
-		cancel <- true
+// AcquireContext attempts to acquire a resource. AcquireContext returns false
+// if we were unable to acquire a resource.
+func (s *Semaphore) AcquireContext(ctx context.Context) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	select {
+	case <-ctx.Done():
 		return false
+	case <-s.channel:
+		s.avail--
+		return true
 	}
-	cancel <- false
-	return true
 }
 
 // Release releases one worker.
 func (s *Semaphore) Release() {
-	s.rMutex.Lock()
-	defer s.rMutex.Unlock()
-
+	if s.avail == s.n {
+		panic("No workers available to release")
+	}
 	s.channel <- struct{}{}
 	s.avail++
 }
 
-// ReleaseMany releases n permits.
-func (s *Semaphore) ReleaseMany(n int) {
-	if n > s.permits {
-		panic("Too many requested releases")
-	}
-	for ; n > 0; n-- {
+func (s *Semaphore) Drain() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for s.avail < s.n {
 		s.Release()
 	}
 }
 
-// AvailablePermits gives number of available unacquired permits.
-func (s *Semaphore) AvailablePermits() int {
-	s.aMutex.RLock()
-	defer s.aMutex.RUnlock()
-
-	if s.avail < 0 {
-		return 0
-	}
-	return s.avail
-}
-
-// DrainPermits acquires all available permits and return the number of permits acquired.
-func (s *Semaphore) DrainPermits() int {
-	n := s.AvailablePermits()
-	if n > 0 {
-		s.AcquireMany(n)
-	}
-	return n
+// Available gives number of unacquired resources.
+func (s *Semaphore) Available() int {
+	s.mu.RLock()
+	avail := s.avail
+	s.mu.RUnlock()
+	return avail
 }
