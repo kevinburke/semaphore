@@ -1,6 +1,7 @@
 package semaphore
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -15,28 +16,28 @@ type Semaphore struct {
 	rMutex  *sync.Mutex
 }
 
-// New creates a new Semaphore with specified number of permits.
-func New(permits int) *Semaphore {
-	if permits < 1 {
+// New creates a new Semaphore with specified number of concurrent workers.
+func New(n int) *Semaphore {
+	if n < 1 {
 		panic("Invalid number of permits. Less than 1")
 	}
 
 	// fill channel buffer
-	channel := make(chan struct{}, permits)
-	for i := 0; i < permits; i++ {
+	channel := make(chan struct{}, n)
+	for i := 0; i < n; i++ {
 		channel <- struct{}{}
 	}
 
 	return &Semaphore{
-		permits,
-		permits,
+		n,
+		n,
 		channel,
 		&sync.RWMutex{},
 		&sync.Mutex{},
 	}
 }
 
-// Acquire acquires one permit. If it is not available, the goroutine will block until it is available.
+// Acquire blocks until a worker becomes available.
 func (s *Semaphore) Acquire() {
 	s.aMutex.Lock()
 	defer s.aMutex.Unlock()
@@ -45,8 +46,8 @@ func (s *Semaphore) Acquire() {
 	s.avail--
 }
 
-// AcquireMany is similar to Acquire() but for many permits.
-// An error is returned if n is greater number of permits in the semaphore.
+// AcquireMany is similar to Acquire() but for many workers.
+// An error is returned if n is greater number of workers in the semaphore.
 func (s *Semaphore) AcquireMany(n int) error {
 	if n > s.permits {
 		return errors.New("Too many requested permits")
@@ -64,9 +65,7 @@ func (s *Semaphore) AcquireMany(n int) error {
 
 // AcquireWithin is similar to AcquireMany() but cancels if duration elapses before getting the permits.
 // Returns true if successful and false if timeout occurs.
-func (s *Semaphore) AcquireWithin(n int, d time.Duration) bool {
-	timeout := make(chan bool, 1)
-	cancel := make(chan bool, 1)
+func (s *Semaphore) AcquireContext(n int, ctx context.Context) bool {
 	go func() {
 		time.Sleep(d)
 		timeout <- true
@@ -86,7 +85,7 @@ func (s *Semaphore) AcquireWithin(n int, d time.Duration) bool {
 	return true
 }
 
-// Release releases one permit.
+// Release releases one worker.
 func (s *Semaphore) Release() {
 	s.rMutex.Lock()
 	defer s.rMutex.Unlock()
