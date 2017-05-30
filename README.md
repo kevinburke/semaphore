@@ -4,14 +4,13 @@ semaphore
 
 Semaphore implementation in golang
 
-[![Build Status](https://travis-ci.org/abiosoft/semaphore.svg?branch=master)](https://travis-ci.org/abiosoft/semaphore)
-[![GoDoc](https://godoc.org/github.com/abiosoft/semaphore?status.svg)](https://godoc.org/github.com/abiosoft/semaphore)
-[![Go Report Card](https://goreportcard.com/badge/github.com/abiosoft/semaphore)](https://goreportcard.com/report/github.com/abiosoft/semaphore)
+[![GoDoc](https://godoc.org/github.com/kevinburke/semaphore?status.svg)](https://godoc.org/github.com/kevinburke/semaphore)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kevinburke/semaphore)](https://goreportcard.com/report/github.com/kevinburke/semaphore)
 
 ### Usage
 Initiate
 ```go
-import "github.com/abiosoft/semaphore"
+import "github.com/kevinburke/semaphore"
 ...
 sem := semaphore.New(5) // new semaphore with 5 permits
 ```
@@ -29,4 +28,4 @@ sem.ReleaseMany(n) // multiple
 
 ### documentation
 
-http://godoc.org/github.com/abiosoft/semaphore
+See here: https://godoc.org/github.com/kevinburke/semaphore
