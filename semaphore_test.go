@@ -52,7 +52,6 @@ func TestAcquireContextNotBusy(t *testing.T) {
 }
 
 func TestAcquireContextBecomesAvailableBeforeTimeout(t *testing.T) {
-	t.Skip("need to rewrite")
 	s := New(1)
 	defer s.Drain()
 	s.Acquire()

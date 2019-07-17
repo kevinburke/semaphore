@@ -49,13 +49,13 @@ func (s *Semaphore) Acquire() {
 // AcquireContext attempts to acquire a resource. AcquireContext returns false
 // if we were unable to acquire a resource.
 func (s *Semaphore) AcquireContext(ctx context.Context) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	select {
 	case <-ctx.Done():
 		return false
 	case <-s.channel:
+		s.mu.Lock()
 		s.avail--
+		s.mu.Unlock()
 		return true
 	}
 }
@@ -65,7 +65,7 @@ func (s *Semaphore) Release() {
 	s.mu.Lock()
 	avail := s.avail
 	s.mu.Unlock()
-	if avail == s.n {
+	if avail >= s.n {
 		panic("No workers available to release")
 	}
 	s.channel <- struct{}{}
