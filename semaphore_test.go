@@ -19,9 +19,7 @@ func TestAcquireContextBusy(t *testing.T) {
 	s := New(1)
 	defer s.Drain()
 	s.Acquire()
-	// ugh this is a mess haha
-	var wg sync.WaitGroup
-	wg.Add(1)
+	ch := make(chan struct{}, 1)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel()
@@ -29,9 +27,9 @@ func TestAcquireContextBusy(t *testing.T) {
 		if ok {
 			t.Errorf("should not have acquired a resource, but did")
 		}
-		wg.Done()
+		ch <- struct{}{}
 	}()
-	wg.Wait()
+	<-ch
 }
 
 func TestAcquireContextNotBusy(t *testing.T) {
@@ -54,7 +52,7 @@ func TestAcquireContextNotBusy(t *testing.T) {
 }
 
 func TestAcquireContextBecomesAvailableBeforeTimeout(t *testing.T) {
-	t.Skip("this test is racy, ugh")
+	t.Skip("need to rewrite")
 	s := New(1)
 	defer s.Drain()
 	s.Acquire()
@@ -68,7 +66,7 @@ func TestAcquireContextBecomesAvailableBeforeTimeout(t *testing.T) {
 	}
 }
 
-func SimultaneousAcquire(t *testing.T) {
+func TestSimultaneousAcquire(t *testing.T) {
 	s := New(2)
 	defer s.Drain()
 	var wg sync.WaitGroup
