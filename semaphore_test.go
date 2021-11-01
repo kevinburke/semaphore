@@ -78,8 +78,8 @@ func TestSimultaneousAcquire(t *testing.T) {
 			wg.Done()
 		}(i)
 	}
+	wg.Wait()
 	if avail := s.Available(); avail != 2 {
 		t.Errorf("expected 2 available, got %d", avail)
 	}
-	wg.Wait()
 }
